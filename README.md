@@ -88,6 +88,8 @@ cd remotely-save
 ./install-ubuntu.sh --vault ~/path/to/vault --android-bundle
 ```
 
+Easiest route on either platform (desktop or Android): install [BRAT](https://github.com/TfTHacker/obsidian42-brat) from the community plugin list, then add beta plugin `knocking4thcylinder/remotely-save`. BRAT pulls `main.js` + `manifest.json` + `styles.css` from this fork's [releases](https://github.com/knocking4thcylinder/remotely-save/releases) and keeps them updated — no USB or manual copying needed.
+
 This checks node ≥ 18, writes a default `.env` with the public OneDrive app credentials (client IDs of installed apps are public by design; see `.env.example.txt` for other services), builds with `npm run build`, sanity-checks the bundle, backs up the stock `main.js`, and installs without touching `data.json` (your tokens). Flags: `--no-build` to only copy, `--android-bundle` to also emit `remotely-save-android.zip` for the phone.
 
 Install on Android (see `./install-android.sh --help`):
