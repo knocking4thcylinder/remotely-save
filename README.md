@@ -83,7 +83,7 @@ What was wrong and what changed:
 Install on Ubuntu desktop:
 
 ```bash
-git clone -b fix/onedrive-auth-hang https://github.com/knocking4thcylinder/remotely-save.git
+git clone https://github.com/knocking4thcylinder/remotely-save.git
 cd remotely-save
 ./install-ubuntu.sh --vault ~/path/to/vault --android-bundle
 ```
