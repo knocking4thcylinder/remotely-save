@@ -19,3 +19,6 @@ logs.txt
 
 # hidden files
 .*
+
+# webpack worker chunks
+*.main.js
