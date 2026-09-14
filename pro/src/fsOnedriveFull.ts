@@ -17,7 +17,10 @@ import {
 } from "../../src/baseTypes";
 import { VALID_REQURL } from "../../src/baseTypesObs";
 import { FakeFs } from "../../src/fsAll";
-import { bufferToArrayBuffer } from "../../src/misc";
+import {
+  bufferToArrayBuffer,
+  extractDisplayNameFromDriveInfo,
+} from "../../src/misc";
 import {
   COMMAND_CALLBACK_ONEDRIVEFULL,
   type OnedriveFullConfig,
@@ -939,16 +942,40 @@ export class FakeFsOnedriveFull extends FakeFs {
       }
     } catch (err) {
       console.debug(err);
-      callbackFunc?.(err);
-      return false;
+      // The `/me` profile endpoint may be down while Drive works fine
+      // (display name is cosmetic). Fall back to proving connectivity
+      // via `_init()` instead of reporting a failure.
+      try {
+        await this._init();
+        return await this.checkConnectCommonOps(callbackFunc);
+      } catch (err2) {
+        console.debug(err2);
+        callbackFunc?.(err2);
+        return false;
+      }
     }
     return await this.checkConnectCommonOps(callbackFunc);
   }
 
   async getUserDisplayName() {
     await this._init();
-    const res: User = await this._getJson("/me?$select=displayName");
-    return res.displayName || "<unknown display name>";
+    try {
+      const res: User = await this._getJson("/me?$select=displayName");
+      if (res.displayName) {
+        return res.displayName;
+      }
+    } catch (err) {
+      console.debug(`falling back to /drive for display name: ${err}`);
+    }
+    try {
+      const drive = await this._getJson(
+        "/drive?$select=createdBy,lastModifiedBy"
+      );
+      return extractDisplayNameFromDriveInfo(drive) || "<unknown display name>";
+    } catch (err) {
+      console.debug(err);
+      return "<unknown display name>";
+    }
   }
 
   /**
