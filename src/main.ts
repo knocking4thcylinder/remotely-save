@@ -642,53 +642,77 @@ export default class RemotelySavePlugin extends Plugin {
             async (e: any) => {
               new Notice(t("protocol_dropbox_connect_fail"));
               new Notice(`${e}`);
-              throw e;
             }
           );
 
           const self = this;
-          setConfigBySuccessfullAuthInplaceDropbox(
-            this.settings.dropbox,
-            authRes!,
-            () => self.saveSettings()
-          );
+          try {
+            if (authRes === undefined) {
+              throw Error(t("protocol_dropbox_connect_fail"));
+            }
+            await setConfigBySuccessfullAuthInplaceDropbox(
+              this.settings.dropbox,
+              authRes!,
+              () => self.saveSettings()
+            );
 
-          const client = getClient(
-            this.settings,
-            this.app.vault.getName(),
-            () => self.saveSettings()
-          );
-          const username = await client.getUserDisplayName();
-          this.settings.dropbox.username = username;
-          await this.saveSettings();
+            const client = getClient(
+              this.settings,
+              this.app.vault.getName(),
+              () => self.saveSettings()
+            );
+            const username = await client.getUserDisplayName();
+            this.settings.dropbox.username = username;
+            await this.saveSettings();
 
-          new Notice(
-            t("protocol_dropbox_connect_succ", {
-              username: username,
-            })
-          );
+            new Notice(
+              t("protocol_dropbox_connect_succ", {
+                username: username,
+              })
+            );
 
-          this.oauth2Info.verifier = ""; // reset it
-          this.oauth2Info.helperModal?.close(); // close it
-          this.oauth2Info.helperModal = undefined;
+            this.oauth2Info.verifier = ""; // reset it
+            this.oauth2Info.helperModal?.close(); // close it
+            this.oauth2Info.helperModal = undefined;
 
-          this.oauth2Info.authDiv?.toggleClass(
-            "dropbox-auth-button-hide",
-            this.settings.dropbox.username !== ""
-          );
-          this.oauth2Info.authDiv = undefined;
+            this.oauth2Info.authDiv?.toggleClass(
+              "dropbox-auth-button-hide",
+              this.settings.dropbox.username !== ""
+            );
+            this.oauth2Info.authDiv = undefined;
 
-          this.oauth2Info.revokeAuthSetting?.setDesc(
-            t("protocol_dropbox_connect_succ_revoke", {
-              username: this.settings.dropbox.username,
-            })
-          );
-          this.oauth2Info.revokeAuthSetting = undefined;
-          this.oauth2Info.revokeDiv?.toggleClass(
-            "dropbox-revoke-auth-button-hide",
-            this.settings.dropbox.username === ""
-          );
-          this.oauth2Info.revokeDiv = undefined;
+            this.oauth2Info.revokeAuthSetting?.setDesc(
+              t("protocol_dropbox_connect_succ_revoke", {
+                username: this.settings.dropbox.username,
+              })
+            );
+            this.oauth2Info.revokeAuthSetting = undefined;
+            this.oauth2Info.revokeDiv?.toggleClass(
+              "dropbox-revoke-auth-button-hide",
+              this.settings.dropbox.username === ""
+            );
+            this.oauth2Info.revokeDiv = undefined;
+          } catch (e: any) {
+            // Never leave the modal stuck at "connecting":
+            // surface the failure inside the modal so the user can close
+            // it and retry with a fresh auth attempt.
+            console.error(e);
+            new Notice(t("protocol_dropbox_connect_fail"));
+            new Notice(`${e}`);
+            if (this.oauth2Info.helperModal !== undefined) {
+              const k = this.oauth2Info.helperModal.contentEl;
+              k.empty();
+              k.createEl("p", {
+                text: `${t("protocol_dropbox_connect_fail")}`,
+              });
+              k.createEl("p", {
+                text: `${e}`,
+              });
+            }
+            this.oauth2Info.verifier = ""; // reset it
+            this.oauth2Info.helperModal = undefined;
+            throw e;
+          }
         } else {
           new Notice(t("protocol_dropbox_connect_fail"));
           throw Error(
@@ -728,29 +752,50 @@ export default class RemotelySavePlugin extends Plugin {
             async (e: any) => {
               new Notice(t("protocol_onedrive_connect_fail"));
               new Notice(`${e}`);
-              return; // throw?
             }
           );
 
-          if ((rsp as any).error !== undefined) {
-            new Notice(`${JSON.stringify(rsp)}`);
-            throw Error(`${JSON.stringify(rsp)}`);
+          try {
+            if (rsp === undefined || (rsp as any).error !== undefined) {
+              new Notice(`${JSON.stringify(rsp)}`);
+              throw Error(`${JSON.stringify(rsp)}`);
+            }
+
+            const self = this;
+            await setConfigBySuccessfullAuthInplaceOnedrive(
+              this.settings.onedrive,
+              rsp as AccessCodeResponseSuccessfulTypeOnedrive,
+              () => self.saveSettings()
+            );
+
+            const client = getClient(
+              this.settings,
+              this.app.vault.getName(),
+              () => self.saveSettings()
+            );
+            this.settings.onedrive.username = await client.getUserDisplayName();
+            await this.saveSettings();
+          } catch (e: any) {
+            // Never leave the modal stuck at "DO NOT close":
+            // surface the failure inside the modal so the user can close
+            // it and retry with a fresh auth attempt.
+            console.error(e);
+            new Notice(t("protocol_onedrive_connect_fail"));
+            new Notice(`${e}`);
+            if (this.oauth2Info.helperModal !== undefined) {
+              const k = this.oauth2Info.helperModal.contentEl;
+              k.empty();
+              k.createEl("p", {
+                text: `${t("protocol_onedrive_connect_fail")}`,
+              });
+              k.createEl("p", {
+                text: `${e}`,
+              });
+            }
+            this.oauth2Info.verifier = ""; // reset it
+            this.oauth2Info.helperModal = undefined;
+            throw e;
           }
-
-          const self = this;
-          setConfigBySuccessfullAuthInplaceOnedrive(
-            this.settings.onedrive,
-            rsp as AccessCodeResponseSuccessfulTypeOnedrive,
-            () => self.saveSettings()
-          );
-
-          const client = getClient(
-            this.settings,
-            this.app.vault.getName(),
-            () => self.saveSettings()
-          );
-          this.settings.onedrive.username = await client.getUserDisplayName();
-          await this.saveSettings();
 
           this.oauth2Info.verifier = ""; // reset it
           this.oauth2Info.helperModal?.close(); // close it
@@ -812,30 +857,51 @@ export default class RemotelySavePlugin extends Plugin {
             async (e: any) => {
               new Notice(t("protocol_onedrivefull_connect_fail"));
               new Notice(`${e}`);
-              return; // throw?
             }
           );
 
-          if ((rsp as any).error !== undefined) {
-            new Notice(`${JSON.stringify(rsp)}`);
-            throw Error(`${JSON.stringify(rsp)}`);
+          try {
+            if (rsp === undefined || (rsp as any).error !== undefined) {
+              new Notice(`${JSON.stringify(rsp)}`);
+              throw Error(`${JSON.stringify(rsp)}`);
+            }
+
+            const self = this;
+            await setConfigBySuccessfullAuthInplaceOnedriveFull(
+              this.settings.onedrivefull,
+              rsp as AccessCodeResponseSuccessfulTypeOnedriveFull,
+              () => self.saveSettings()
+            );
+
+            const client = getClient(
+              this.settings,
+              this.app.vault.getName(),
+              () => self.saveSettings()
+            );
+            this.settings.onedrivefull.username =
+              await client.getUserDisplayName();
+            await this.saveSettings();
+          } catch (e: any) {
+            // Never leave the modal stuck at "DO NOT close":
+            // surface the failure inside the modal so the user can close
+            // it and retry with a fresh auth attempt.
+            console.error(e);
+            new Notice(t("protocol_onedrivefull_connect_fail"));
+            new Notice(`${e}`);
+            if (this.oauth2Info.helperModal !== undefined) {
+              const k = this.oauth2Info.helperModal.contentEl;
+              k.empty();
+              k.createEl("p", {
+                text: `${t("protocol_onedrivefull_connect_fail")}`,
+              });
+              k.createEl("p", {
+                text: `${e}`,
+              });
+            }
+            this.oauth2Info.verifier = ""; // reset it
+            this.oauth2Info.helperModal = undefined;
+            throw e;
           }
-
-          const self = this;
-          setConfigBySuccessfullAuthInplaceOnedriveFull(
-            this.settings.onedrivefull,
-            rsp as AccessCodeResponseSuccessfulTypeOnedriveFull,
-            () => self.saveSettings()
-          );
-
-          const client = getClient(
-            this.settings,
-            this.app.vault.getName(),
-            () => self.saveSettings()
-          );
-          this.settings.onedrivefull.username =
-            await client.getUserDisplayName();
-          await this.saveSettings();
 
           this.oauth2Info.verifier = ""; // reset it
           this.oauth2Info.helperModal?.close(); // close it

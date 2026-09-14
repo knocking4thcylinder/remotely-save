@@ -151,6 +151,7 @@ export const sendAuthReq = async (
   } catch (e) {
     console.error(e);
     await errorCallBack(e);
+    throw e;
   }
 };
 
@@ -196,7 +197,7 @@ export const setConfigBySuccessfullAuthInplace = async (
   console.info("start updating local info of OneDrive token");
   config.accessToken = authRes.access_token;
   config.accessTokenExpiresAtTime =
-    Date.now() + authRes.expires_in - 5 * 60 * 1000;
+    Date.now() + authRes.expires_in * 1000 - 5 * 60 * 1000;
   config.accessTokenExpiresInSeconds = authRes.expires_in;
   config.refreshToken = authRes.refresh_token!;
 
@@ -431,13 +432,21 @@ export class FakeFsOnedriveFull extends FakeFs {
           .length > 0;
       if (!this.vaultFolderExists) {
         console.info(`remote does not have folder /${this.remoteBaseDir}`);
-        await this._postJson("/drive/root/children", {
-          name: `${this.remoteBaseDir}`,
-          folder: {},
-          "@microsoft.graph.conflictBehavior": "replace",
-        });
-        console.info(`remote folder /${this.remoteBaseDir} created`);
-        this.vaultFolderExists = true;
+        // NOTE: creating the folder via POST `/drive/root/children` is
+        // rejected by Graph with `400 invalidRequest` (same as the AppFolder
+        // variant). Creating it via PATCH on the item path works (same
+        // approach as `_mkdirFromRoot`).
+        if (this.remoteBaseDir === "") {
+          // drive root itself is the vault folder, nothing to create
+          this.vaultFolderExists = true;
+        } else {
+          await this._patchJson(`/drive/root:/${this.remoteBaseDir}`, {
+            folder: {},
+            "@microsoft.graph.conflictBehavior": "replace",
+          });
+          console.info(`remote folder /${this.remoteBaseDir} created`);
+          this.vaultFolderExists = true;
+        }
       } else {
         // console.info(`remote folder /${this.remoteBaseDir} exists`);
       }
